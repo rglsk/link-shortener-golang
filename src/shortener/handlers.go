@@ -1,16 +1,18 @@
 package shortener
 
 import (
-	"net/http"
 	"appengine"
 	"appengine/memcache"
-	"html/template"
 	"fmt"
+	"github.com/gorilla/mux"
+	"html/template"
 	"log"
 	"strings"
+	"net/http"
+	"time"
 )
 
-const BaseUrl  = "localhost:8080"
+const BaseUrl  = "http://localhost:8080"
 
 
 func render(w http.ResponseWriter, context interface{}, template_path string) {
@@ -26,21 +28,12 @@ func render(w http.ResponseWriter, context interface{}, template_path string) {
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	context := map[string]interface{}{
-		"Car": "value",
-		"papa": "jeden",
-	}
-	render(w, context, "shortener/templates/index.html")
+	render(w, nil, "shortener/templates/index.html")
 
 }
 
 func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusNotFound)
-		return
-	}
 	originUrl := r.FormValue("originUrl")
-	log.Print(r.Method)
 	log.Print(originUrl)
 	urlSuffix := GenerateUrlSuffix()
 	ctx := appengine.NewContext(r)
@@ -48,9 +41,29 @@ func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 	item := &memcache.Item{
 		Key:   urlSuffix,
 		Value: []byte(originUrl),
+		Expiration: time.Second*60*15,
 	}
 	if err := memcache.Add(ctx, item); err != nil {
 		fmt.Println(err)
 	}
-	fmt.Fprint(w, shorterUrl)
+	context := map[string]interface{}{
+		"resultUrl": shorterUrl,
+	}
+	render(w, context, "shortener/templates/result.html")
+}
+
+func OriginalRedirect(w http.ResponseWriter, r *http.Request){
+	vars := mux.Vars(r)
+	ctx := appengine.NewContext(r)
+	log.Println(vars["urlHash"])
+	urlItem, err := memcache.Get(ctx, vars["urlHash"])
+	if err != nil{
+		fmt.Fprint(w, "Short url died")
+		return
+	}
+	var url string
+	if url = string(urlItem.Value); !strings.HasPrefix(url, "http"){
+		url = "http://" + url
+	}
+	http.Redirect(w, r, url , http.StatusSeeOther)
 }
