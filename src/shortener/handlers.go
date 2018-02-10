@@ -44,12 +44,9 @@ func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 		Value: []byte(originUrl),
 		Expiration: time.Second*60*15,
 	}
-	e := new(models.UrlHistory)
-	e.OriginalUrl = originUrl
-	e.ShortUrl = shorterUrl
-	e.Created = time.Now()
-	k := datastore.NewKey(ctx, "UrlHistory", "stringID", 0, nil)
-	if _, err := datastore.Put(ctx, k, e); err != nil {
+	entity := models.UrlHistory{OriginalUrl:originUrl, ShortUrl:urlSuffix, Created:time.Now()}
+	key := datastore.NewKey(ctx, "UrlHistory", "", 0, nil)
+	if _, err := datastore.Put(ctx, key, &entity); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
@@ -67,12 +64,19 @@ func OriginalRedirect(w http.ResponseWriter, r *http.Request){
 	ctx := appengine.NewContext(r)
 	log.Println(vars["urlHash"])
 	urlItem, err := memcache.Get(ctx, vars["urlHash"])
-	if err != nil{
-		fmt.Fprint(w, "Short url died")
-		return
-	}
 	var url string
-	if url = string(urlItem.Value); !strings.HasPrefix(url, "http"){
+	if err != nil{
+		var urlHistories []models.UrlHistory
+		datastore.NewQuery("UrlHistory").Filter("ShortUrl =", vars["urlHash"]).GetAll(ctx, &urlHistories)
+		if len(urlHistories) == 0 {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		url = urlHistories[0].OriginalUrl
+	} else {
+		url = string(urlItem.Value)
+	}
+	if !strings.HasPrefix(url, "http"){
 		url = "http://" + url
 	}
 	http.Redirect(w, r, url , http.StatusSeeOther)
