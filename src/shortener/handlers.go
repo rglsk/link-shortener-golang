@@ -2,12 +2,14 @@ package shortener
 
 import (
 	"appengine"
+	"appengine/datastore"
 	"appengine/memcache"
 	"fmt"
 	"github.com/gorilla/mux"
 	"html/template"
 	"log"
 	"strings"
+	"shortener/models"
 	"net/http"
 	"time"
 )
@@ -29,7 +31,6 @@ func render(w http.ResponseWriter, context interface{}, template_path string) {
 
 func Index(w http.ResponseWriter, r *http.Request) {
 	render(w, nil, "shortener/templates/index.html")
-
 }
 
 func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +43,15 @@ func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 		Key:   urlSuffix,
 		Value: []byte(originUrl),
 		Expiration: time.Second*60*15,
+	}
+	e := new(models.UrlHistory)
+	e.OriginalUrl = originUrl
+	e.ShortUrl = shorterUrl
+	e.Created = time.Now()
+	k := datastore.NewKey(ctx, "UrlHistory", "stringID", 0, nil)
+	if _, err := datastore.Put(ctx, k, e); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
 	}
 	if err := memcache.Add(ctx, item); err != nil {
 		fmt.Println(err)
