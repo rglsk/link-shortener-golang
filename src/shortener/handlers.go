@@ -66,13 +66,13 @@ func OriginalRedirect(w http.ResponseWriter, r *http.Request){
 	urlItem, err := memcache.Get(ctx, vars["urlHash"])
 	var url string
 	if err != nil{
-		var urlHistories []models.UrlHistory
-		datastore.NewQuery("UrlHistory").Filter("ShortUrl =", vars["urlHash"]).GetAll(ctx, &urlHistories)
-		if len(urlHistories) == 0 {
+		entity := new(models.UrlHistory)
+		k := datastore.NewKey(ctx, "UrlHistory", vars["urlHash"], 0, nil)
+		if err := datastore.Get(ctx, k, *entity); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		url = urlHistories[0].OriginalUrl
+		url = entity.OriginalUrl
 	} else {
 		url = string(urlItem.Value)
 	}
