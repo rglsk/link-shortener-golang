@@ -36,19 +36,19 @@ func Index(w http.ResponseWriter, r *http.Request) {
 func CreateShortUrl(w http.ResponseWriter, r *http.Request) {
 	originUrl := r.FormValue("originUrl")
 	log.Print(originUrl)
-	urlSuffix := GenerateUrlSuffix()
 	ctx := appengine.NewContext(r)
-	shorterUrl := BaseUrl + "/" + urlSuffix
-	item := &memcache.Item{
-		Key:   urlSuffix,
-		Value: []byte(originUrl),
-		Expiration: time.Second*60*15,
-	}
-	entity := models.UrlHistory{OriginalUrl:originUrl, ShortUrl:urlSuffix, Created:time.Now()}
-	key := datastore.NewKey(ctx, "UrlHistory", "", 0, nil)
+
+	entity := models.UrlHistory{OriginalUrl:originUrl, Created:time.Now()}
+	key := entity.CreateKey(ctx)
 	if _, err := datastore.Put(ctx, key, &entity); err != nil {
 		http.Error(w, err.Error(), 500)
 		return
+	}
+	shorterUrl := BaseUrl + "/" + entity.ShortUrl
+	item := &memcache.Item{
+		Key:   entity.ShortUrl,
+		Value: []byte(originUrl),
+		Expiration: time.Second*60*15,
 	}
 	if err := memcache.Add(ctx, item); err != nil {
 		fmt.Println(err)

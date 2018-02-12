@@ -1,8 +1,8 @@
-package shortener
+package generator
 
 import (
-	"math/rand"
-	"time"
+"math/rand"
+"time"
 )
 
 
@@ -23,3 +23,4 @@ func GenerateUrlSuffix() string {
 	randomString := RandomStringWithCharset(5, charset)
 	return randomString
 }
+
